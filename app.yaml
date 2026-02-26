@@ -1,0 +1,7 @@
+name: Powiadomski
+description: ""
+ports: []
+bricks:
+- arduino:web_ui: {}
+- arduino:dbstorage_sqlstore: {}
+icon: 📳

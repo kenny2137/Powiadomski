@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>POWIADOMSKI</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; max-width: 900px; }
+        .box { background: #f4f4f4; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        input { padding: 8px; width: 60%; }
+        button { padding: 8px 16px; background: #00979d; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+        th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #eee; }
+        pre { margin: 0; white-space: pre-wrap; font-family: monospace; font-size: 13px;}
+        .inbox-th { background-color: #d1ecf1; }
+    </style>
+</head>
+<body>
+    <h>POWIADOMSKI PANEL</h2>
+
+    <div class="box">
+        <label><b>SEND AT COMMAND:</b></label><br><br>
+        <input type="text" id="cmdInput" placeholder="np. AT+CSQ">
+        <button onclick="sendCommand()">Wyślij</button>
+    </div>
+
+    <button onclick="fetchAll()" style="margin-bottom: 10px; background: #555;">REFRESH</button>
+
+    <h3>Recive (SMS)</h3>
+    <table>
+        <thead>
+            <tr>
+                <th class="inbox-th" style="width: 20%">Data</th>
+                <th class="inbox-th" style="width: 25%">Nadawca</th>
+                <th class="inbox-th">Treść Wiadomości</th>
+            </tr>
+        </thead>
+        <tbody id="smsTable">
+            <tr><td colspan="3">LOADING MESSAGE...</td></tr>
+        </tbody>
+    </table>
+
+    <h3>RAW LOGS (AT)</h3>
+    <table>
+        <thead>
+            <tr><th style="width: 25%">Czas (UTC)</th><th>Dane odebrane</th></tr>
+        </thead>
+        <tbody id="logsTable">
+            <tr><td colspan="2">LOADING...</td></tr>
+        </tbody>
+    </table>
+
+    <script>
+        async function fetchAll() {
+            await loadSMS();
+            await loadLogs();
+        }
+
+        async function loadSMS() {
+            try {
+                const response = await fetch('/api/sms');
+                const data = await response.json();
+                let html = '';
+                data.sms.forEach(msg => {
+                    html += `<tr>
+                                <td>${msg.time}</td>
+                                <td><b>${msg.sender}</b></td>
+                                <td>${msg.content}</td>
+                             </tr>`;
+                });
+                document.getElementById('smsTable').innerHTML = html || '<tr><td colspan="3" style="text-align:center;">empty base</td></tr>';
+            } catch (err) { console.error(err); }
+        }
+
+        async function loadLogs() {
+            try {
+                const response = await fetch('/api/logs');
+                const data = await response.json();
+                let html = '';
+                data.logs.forEach(log => {
+                    html += `<tr><td>${log.time}</td><td><pre>${log.data}</pre></td></tr>`;
+                });
+                document.getElementById('logsTable').innerHTML = html || '<tr><td colspan="2" style="text-align:center;">Brak logów</td></tr>';
+            } catch (err) { console.error(err); }
+        }
+
+        async function sendCommand() {
+            const cmd = document.getElementById('cmdInput').value;
+            if(!cmd) return;
+            try {
+                await fetch(`/api/send?cmd=${encodeURIComponent(cmd)}`, { method: 'POST' });
+                document.getElementById('cmdInput').value = ''; 
+                setTimeout(fetchAll, 1000); 
+            } catch (err) { console.error(err); }
+        }
+
+        window.onload = fetchAll;
+    </script>
+</body>
+</html>
