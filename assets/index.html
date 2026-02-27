@@ -21,18 +21,18 @@
     <div class="box">
         <label><b>SEND AT COMMAND:</b></label><br><br>
         <input type="text" id="cmdInput" placeholder="np. AT+CSQ">
-        <button onclick="sendCommand()">Wyślij</button>
+        <button onclick="sendCommand()">SEND</button>
     </div>
 
     <button onclick="fetchAll()" style="margin-bottom: 10px; background: #555;">REFRESH</button>
 
-    <h3>Recive (SMS)</h3>
+    <h3>RECIVE (SMS)</h3>
     <table>
         <thead>
             <tr>
-                <th class="inbox-th" style="width: 20%">Data</th>
-                <th class="inbox-th" style="width: 25%">Nadawca</th>
-                <th class="inbox-th">Treść Wiadomości</th>
+                <th class="inbox-th" style="width: 20%">DATE</th>
+                <th class="inbox-th" style="width: 25%">SENDER</th>
+                <th class="inbox-th">CONTENT</th>
             </tr>
         </thead>
         <tbody id="smsTable">
@@ -43,7 +43,7 @@
     <h3>RAW LOGS (AT)</h3>
     <table>
         <thead>
-            <tr><th style="width: 25%">Czas (UTC)</th><th>Dane odebrane</th></tr>
+            <tr><th style="width: 25%">Czas (UTC)</th><th>COLLECTED DATA</th></tr>
         </thead>
         <tbody id="logsTable">
             <tr><td colspan="2">LOADING...</td></tr>
