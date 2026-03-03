@@ -94,9 +94,32 @@ def send_command_api(cmd: str):
     Bridge.notify("send_at", cmd + "\r\n")
     return {"status": "success"}
 
+def clear_db_api():
+    """Clean DB"""
+    print("[WWW] CLEAN DB...")
+    db.execute_sql("DELETE FROM sms_logs")
+    db.execute_sql("DELETE FROM sms_messages")
+    return {"status": "success", "message": "DONE"}
+
+def export_db_api():
+    """Export content from DB."""
+    logs = db.execute_sql("SELECT timestamp, data FROM sms_logs ORDER BY id ASC")
+    sms = db.execute_sql("SELECT timestamp, sender, content FROM sms_messages ORDER BY id ASC")
+    
+    if not logs: logs = []
+    if not sms: sms = []
+    
+    return {
+        "logs": [{"time": r["timestamp"], "data": r["data"]} for r in logs],
+        "sms": [{"time": r["timestamp"], "sender": r["sender"], "content": r["content"]} for r in sms]
+    }
+
+
 ui.expose_api("GET", "/api/logs", get_logs_api)
 ui.expose_api("GET", "/api/sms", get_sms_api)
 ui.expose_api("POST", "/api/send", send_command_api)
+ui.expose_api("POST", "/api/clear", clear_db_api)
+ui.expose_api("GET", "/api/export", export_db_api)
 
 print("Aplication RUN!")
 App.run(user_loop=lambda: None)
