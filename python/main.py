@@ -1,5 +1,6 @@
 import re
 import json
+import time
 import urllib.request
 import threading
 from arduino.app_utils import App, Bridge
@@ -8,7 +9,7 @@ from arduino.app_bricks.dbstorage_sqlstore import SQLStore
 
 # Webhook config
 WEBHOOK_URL = "https://your.webhook.com/url.here"
-ui = WebUI()
+ui = WebUI() #To secure the panel during implementation, add addr="127.0.0.1" to the webui function.
 db = SQLStore("gsm_data.db")
 
 if hasattr(db, 'start'):
@@ -78,6 +79,16 @@ def on_gsm_rx(data):
             threading.Thread(target=send_webhook, args=(sender, content), daemon=True).start()
 
 Bridge.provide("gsm_rx", on_gsm_rx)
+
+CLEANUP_INTERVAL_HOURS = 6
+
+def gsm_cleanup_loop():
+    while True:
+        time.sleep(CLEANUP_INTERVAL_HOURS * 3600)
+        print(f"[CLEANUP] Deleting all SMS from GSM module (AT+CMGD=1,4)...")
+        Bridge.notify("send_at", "AT+CMGD=1,4\r\n")
+
+threading.Thread(target=gsm_cleanup_loop, daemon=True).start()
 
 def get_logs_api():
     rows = db.execute_sql("SELECT timestamp, data FROM sms_logs ORDER BY id DESC")
