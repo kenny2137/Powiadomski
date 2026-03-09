@@ -7,8 +7,9 @@ from arduino.app_utils import App, Bridge
 from arduino.app_bricks.web_ui import WebUI
 from arduino.app_bricks.dbstorage_sqlstore import SQLStore 
 
-# Webhook config
-WEBHOOK_URL = "https://your.webhook.com/url.here"
+# Webhook config — set WEBHOOK_TYPE to "discord" or "teams"
+WEBHOOK_TYPE = "discord"
+WEBHOOK_URL = ""
 ui = WebUI() #To secure the panel during implementation, add addr="127.0.0.1" to the webui function.
 db = SQLStore("gsm_data.db")
 
@@ -29,28 +30,41 @@ def init_db():
 
 init_db()
 
-def send_webhook(sender, content):
-    if not WEBHOOK_URL or WEBHOOK_URL == "https://your.webhook.com/url.here":
-        return 
-        
-    try:
+def _build_payload(sender, content):
+    if WEBHOOK_TYPE == "teams":
+        return {
+            "@type": "MessageCard",
+            "@context": "http://schema.org/extensions", #boilerplate
+            "summary": "New SMS",
+            "themeColor": "0076D7",
+            "sections": [{
+                "activityTitle": "📨 New SMS received",
+                "facts": [
+                    {"name": "From", "value": sender},
+                    {"name": "Content", "value": content}
+                ]
+            }]
+        }
+    # discord (default)
+    return {
+        "content": f"📨 **NEW SMS!**\n**From:** `{sender}`\n**Content:** {content}"
+    }
 
-        payload = {
-            "content": f"📨 **NEW SMS!**\n**From:** `{sender}`\n**Content:** {content}"
-        }
-        dane_json = json.dumps(payload).encode('utf-8')
-        
-        headers = {
-            'Content-Type': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Powiadomski)' 
-        }
-        
-        req = urllib.request.Request(WEBHOOK_URL, data=dane_json, headers=headers)
-        
+def send_webhook(sender, content):
+    if not WEBHOOK_URL:
+        return
+
+    try:
+        payload = _build_payload(sender, content)
+        req = urllib.request.Request(
+            WEBHOOK_URL,
+            data=json.dumps(payload).encode('utf-8'),
+            headers={'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (Powiadomski)'}
+        )
         urllib.request.urlopen(req, timeout=5)
-        print(f"[WEBHOOK] Notification successfully sent to Discord!")
+        print(f"[WEBHOOK] Notification sent via {WEBHOOK_TYPE}!")
     except Exception as e:
-        print(f"[WEBHOOK ERROR] Failed to send to Discord: {e}")
+        print(f"[WEBHOOK ERROR] Failed to send ({WEBHOOK_TYPE}): {e}")
 
 def on_gsm_rx(data):
     data_str = data.strip()
