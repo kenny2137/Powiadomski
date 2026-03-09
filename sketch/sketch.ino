@@ -18,9 +18,9 @@ void setup() {
   gsmResponse.reserve(1024);
   atCommand.reserve(256);
   
-  Monitor.println("Czekam 3 sekundy na start modemu SIM7670E...");
+  Monitor.println("Wait 3 seconds to run SIM7670E...");
   delay(3000); 
-  Monitor.println("Wysylam konfiguracje SMS...");
+  Monitor.println("Send config SMS...");
   Serial.print("AT+CMGF=1\r\n");
   delay(500);
   Serial.print("AT+CNMI=1,1,0,0,0\r\n");
@@ -46,7 +46,7 @@ void loop() {
     gsmResponse = "";
   }
 
-  // --- Transmit AT Commands (z Monitora) ---
+  // --- Transmit AT Commands (from Monitor) ---
   if (Monitor.available()) {
     unsigned long lastCharTime = millis();
     

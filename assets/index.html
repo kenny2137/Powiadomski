@@ -7,7 +7,9 @@
         body { font-family: sans-serif; margin: 20px; max-width: 900px; }
         .box { background: #f4f4f4; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
         input { padding: 8px; width: 60%; }
-        button { padding: 8px 16px; background: #00979d; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button { padding: 8px 16px; background: #00979d; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px; }
+        .btn-danger { background: #dc3545; }
+        .btn-success { background: #28a745; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
         th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
         th { background-color: #eee; }
@@ -16,7 +18,7 @@
     </style>
 </head>
 <body>
-    <h>POWIADOMSKI PANEL</h2>
+    <h2>POWIADOMSKI</h2>
 
     <div class="box">
         <label><b>SEND AT COMMAND:</b></label><br><br>
@@ -24,29 +26,33 @@
         <button onclick="sendCommand()">SEND</button>
     </div>
 
-    <button onclick="fetchAll()" style="margin-bottom: 10px; background: #555;">REFRESH</button>
+    <div style="margin-bottom: 15px;">
+        <button onclick="fetchAll()" style="background: #555;">REFRESH</button>
+        <button onclick="exportDatabase()" class="btn-success">💾 EXPORT DATA</button>
+        <button onclick="clearDatabase()" class="btn-danger">🗑️ CLEAN DB</button>
+    </div>
 
-    <h3>RECIVE (SMS)</h3>
+    <h3>INBOX (SMS)</h3>
     <table>
         <thead>
             <tr>
-                <th class="inbox-th" style="width: 20%">DATE</th>
-                <th class="inbox-th" style="width: 25%">SENDER</th>
-                <th class="inbox-th">CONTENT</th>
+                <th class="inbox-th" style="width: 20%">Data</th>
+                <th class="inbox-th" style="width: 25%">Sender</th>
+                <th class="inbox-th">Content</th>
             </tr>
         </thead>
         <tbody id="smsTable">
-            <tr><td colspan="3">LOADING MESSAGE...</td></tr>
+            <tr><td colspan="3">Loading message...</td></tr>
         </tbody>
     </table>
 
-    <h3>RAW LOGS (AT)</h3>
+    <h3>RAW DATA(AT)</h3>
     <table>
         <thead>
-            <tr><th style="width: 25%">Czas (UTC)</th><th>COLLECTED DATA</th></tr>
+            <tr><th style="width: 25%">TIME (UTC)</th><th>Respond data</th></tr>
         </thead>
         <tbody id="logsTable">
-            <tr><td colspan="2">LOADING...</td></tr>
+            <tr><td colspan="2">loading logs...</td></tr>
         </tbody>
     </table>
 
@@ -68,7 +74,7 @@
                                 <td>${msg.content}</td>
                              </tr>`;
                 });
-                document.getElementById('smsTable').innerHTML = html || '<tr><td colspan="3" style="text-align:center;">empty base</td></tr>';
+                document.getElementById('smsTable').innerHTML = html || '<tr><td colspan="3" style="text-align:center;">EMPTY</td></tr>';
             } catch (err) { console.error(err); }
         }
 
@@ -80,7 +86,7 @@
                 data.logs.forEach(log => {
                     html += `<tr><td>${log.time}</td><td><pre>${log.data}</pre></td></tr>`;
                 });
-                document.getElementById('logsTable').innerHTML = html || '<tr><td colspan="2" style="text-align:center;">Brak logów</td></tr>';
+                document.getElementById('logsTable').innerHTML = html || '<tr><td colspan="2" style="text-align:center;">EMPTY</td></tr>';
             } catch (err) { console.error(err); }
         }
 
@@ -92,6 +98,33 @@
                 document.getElementById('cmdInput').value = ''; 
                 setTimeout(fetchAll, 1000); 
             } catch (err) { console.error(err); }
+        }
+
+        async function clearDatabase() {
+            if(!confirm("Are you sure you want to delete all logs and text messages? This operation cannot be canceled!")) {
+                return;
+            }
+            try {
+                await fetch('/api/clear', { method: 'POST' });
+                alert("The database has been successfully cleaned.");
+                fetchAll();
+            } catch (err) { console.error("error:", err); }
+        }
+
+        async function exportDatabase() {
+            try {
+                const response = await fetch('/api/export');
+                const data = await response.json();
+                
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+                const downloadNode = document.createElement('a');
+                downloadNode.setAttribute("href", dataStr);
+                downloadNode.setAttribute("download", "powiadomski_backup.json");
+                
+                document.body.appendChild(downloadNode);
+                downloadNode.click();
+                downloadNode.remove();
+            } catch (err) { console.error("error:", err); }
         }
 
         window.onload = fetchAll;

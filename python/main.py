@@ -1,14 +1,16 @@
 import re
 import json
+import time
 import urllib.request
 import threading
 from arduino.app_utils import App, Bridge
 from arduino.app_bricks.web_ui import WebUI
 from arduino.app_bricks.dbstorage_sqlstore import SQLStore 
 
-# Webhook config
-WEBHOOK_URL = "https://your.webhook.com/url.here"
-ui = WebUI()
+# Webhook config — set WEBHOOK_TYPE to "discord" or "teams"
+WEBHOOK_TYPE = "discord"
+WEBHOOK_URL = ""
+ui = WebUI() #To secure the panel during implementation, add addr="127.0.0.1" to the webui function.
 db = SQLStore("gsm_data.db")
 
 if hasattr(db, 'start'):
@@ -28,28 +30,41 @@ def init_db():
 
 init_db()
 
-def send_webhook(sender, content):
-    if not WEBHOOK_URL or WEBHOOK_URL == "https://your.webhook.com/url.here":
-        return 
-        
-    try:
+def _build_payload(sender, content):
+    if WEBHOOK_TYPE == "teams":
+        return {
+            "@type": "MessageCard",
+            "@context": "http://schema.org/extensions", #boilerplate
+            "summary": "New SMS",
+            "themeColor": "0076D7",
+            "sections": [{
+                "activityTitle": "📨 New SMS received",
+                "facts": [
+                    {"name": "From", "value": sender},
+                    {"name": "Content", "value": content}
+                ]
+            }]
+        }
+    # discord (default)
+    return {
+        "content": f"📨 **NEW SMS!**\n**From:** `{sender}`\n**Content:** {content}"
+    }
 
-        payload = {
-            "content": f"📨 **NEW SMS!**\n**From:** `{sender}`\n**Content:** {content}"
-        }
-        dane_json = json.dumps(payload).encode('utf-8')
-        
-        headers = {
-            'Content-Type': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Powiadomski)' 
-        }
-        
-        req = urllib.request.Request(WEBHOOK_URL, data=dane_json, headers=headers)
-        
+def send_webhook(sender, content):
+    if not WEBHOOK_URL:
+        return
+
+    try:
+        payload = _build_payload(sender, content)
+        req = urllib.request.Request(
+            WEBHOOK_URL,
+            data=json.dumps(payload).encode('utf-8'),
+            headers={'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (Powiadomski)'}
+        )
         urllib.request.urlopen(req, timeout=5)
-        print(f"[WEBHOOK] Notification successfully sent to Discord!")
+        print(f"[WEBHOOK] Notification sent via {WEBHOOK_TYPE}!")
     except Exception as e:
-        print(f"[WEBHOOK ERROR] Failed to send to Discord: {e}")
+        print(f"[WEBHOOK ERROR] Failed to send ({WEBHOOK_TYPE}): {e}")
 
 def on_gsm_rx(data):
     data_str = data.strip()
@@ -79,6 +94,16 @@ def on_gsm_rx(data):
 
 Bridge.provide("gsm_rx", on_gsm_rx)
 
+CLEANUP_INTERVAL_HOURS = 6
+
+def gsm_cleanup_loop():
+    while True:
+        time.sleep(CLEANUP_INTERVAL_HOURS * 3600)
+        print(f"[CLEANUP] Deleting all SMS from GSM module (AT+CMGD=1,4)...")
+        Bridge.notify("send_at", "AT+CMGD=1,4\r\n")
+
+threading.Thread(target=gsm_cleanup_loop, daemon=True).start()
+
 def get_logs_api():
     rows = db.execute_sql("SELECT timestamp, data FROM sms_logs ORDER BY id DESC")
     if not rows: rows = []
@@ -94,9 +119,32 @@ def send_command_api(cmd: str):
     Bridge.notify("send_at", cmd + "\r\n")
     return {"status": "success"}
 
+def clear_db_api():
+    """Clean DB"""
+    print("[WWW] CLEAN DB...")
+    db.execute_sql("DELETE FROM sms_logs")
+    db.execute_sql("DELETE FROM sms_messages")
+    return {"status": "success", "message": "DONE"}
+
+def export_db_api():
+    """Export content from DB."""
+    logs = db.execute_sql("SELECT timestamp, data FROM sms_logs ORDER BY id ASC")
+    sms = db.execute_sql("SELECT timestamp, sender, content FROM sms_messages ORDER BY id ASC")
+    
+    if not logs: logs = []
+    if not sms: sms = []
+    
+    return {
+        "logs": [{"time": r["timestamp"], "data": r["data"]} for r in logs],
+        "sms": [{"time": r["timestamp"], "sender": r["sender"], "content": r["content"]} for r in sms]
+    }
+
+
 ui.expose_api("GET", "/api/logs", get_logs_api)
 ui.expose_api("GET", "/api/sms", get_sms_api)
 ui.expose_api("POST", "/api/send", send_command_api)
+ui.expose_api("POST", "/api/clear", clear_db_api)
+ui.expose_api("GET", "/api/export", export_db_api)
 
 print("Aplication RUN!")
 App.run(user_loop=lambda: None)
